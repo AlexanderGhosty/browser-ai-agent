@@ -1,0 +1,257 @@
+import type { Page } from 'playwright';
+import { logger } from '../utils/logger.js';
+
+/**
+ * Low-level browser action wrappers with error handling.
+ * Each action returns a string result suitable for sending back to the LLM.
+ */
+export class BrowserActions {
+    private page: Page;
+
+    constructor(page: Page) {
+        this.page = page;
+    }
+
+    setPage(page: Page) {
+        this.page = page;
+    }
+
+    /**
+     * Navigate to a URL.
+     */
+    async navigate(url: string): Promise<string> {
+        try {
+            // Add protocol if missing
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+            }
+
+            await this.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await this.page.waitForTimeout(1000); // Small delay for dynamic content
+            const title = await this.page.title();
+            return `Navigated to ${url} — page title: "${title}"`;
+        } catch (error) {
+            return `Navigation failed: ${error instanceof Error ? error.message : error}`;
+        }
+    }
+
+    /**
+     * Click on an element identified by a selector string.
+     * Supports CSS selectors, text selectors, and role-based selectors.
+     */
+    async click(selector: string): Promise<string> {
+        try {
+            const locator = this.resolveLocator(selector);
+            await locator.click({ timeout: 5000 });
+            await this.page.waitForTimeout(800);
+            return `Clicked on "${selector}" successfully`;
+        } catch (error) {
+            return `Click failed on "${selector}": ${error instanceof Error ? error.message : error}`;
+        }
+    }
+
+    /**
+     * Type text into an input element.
+     */
+    async type(selector: string, text: string): Promise<string> {
+        try {
+            const locator = this.resolveLocator(selector);
+            await locator.fill(text, { timeout: 5000 });
+            return `Typed "${text}" into "${selector}"`;
+        } catch (error) {
+            // If fill doesn't work, try click + type
+            try {
+                const locator = this.resolveLocator(selector);
+                await locator.click({ timeout: 5000 });
+                await this.page.keyboard.type(text, { delay: 30 });
+                return `Typed "${text}" into "${selector}" (via keyboard)`;
+            } catch (retryError) {
+                return `Type failed on "${selector}": ${error instanceof Error ? error.message : error}`;
+            }
+        }
+    }
+
+    /**
+     * Scroll the page in a direction.
+     */
+    async scroll(direction: 'up' | 'down'): Promise<string> {
+        try {
+            const delta = direction === 'down' ? 600 : -600;
+            await this.page.mouse.wheel(0, delta);
+            await this.page.waitForTimeout(500);
+
+            const scrollY = await this.page.evaluate(() => window.scrollY);
+            return `Scrolled ${direction}. Current scroll position: ${Math.round(scrollY)}px`;
+        } catch (error) {
+            return `Scroll failed: ${error instanceof Error ? error.message : error}`;
+        }
+    }
+
+    /**
+     * Go back to the previous page.
+     */
+    async goBack(): Promise<string> {
+        try {
+            await this.page.goBack({ waitUntil: 'domcontentloaded', timeout: 10000 });
+            await this.page.waitForTimeout(800);
+            const title = await this.page.title();
+            const url = this.page.url();
+            return `Navigated back to "${title}" (${url})`;
+        } catch (error) {
+            return `Go back failed: ${error instanceof Error ? error.message : error}`;
+        }
+    }
+
+    /**
+     * Select an option from a dropdown/select element.
+     */
+    async selectOption(selector: string, value: string): Promise<string> {
+        try {
+            const locator = this.resolveLocator(selector);
+            await locator.selectOption(value, { timeout: 5000 });
+            return `Selected "${value}" in "${selector}"`;
+        } catch (error) {
+            return `Select option failed on "${selector}": ${error instanceof Error ? error.message : error}`;
+        }
+    }
+
+    /**
+     * Press a keyboard key.
+     */
+    async pressKey(key: string): Promise<string> {
+        try {
+            await this.page.keyboard.press(key);
+            await this.page.waitForTimeout(500);
+            return `Pressed key "${key}"`;
+        } catch (error) {
+            return `Press key failed: ${error instanceof Error ? error.message : error}`;
+        }
+    }
+
+    /**
+     * Hover over an element.
+     */
+    async hover(selector: string): Promise<string> {
+        try {
+            const locator = this.resolveLocator(selector);
+            await locator.hover({ timeout: 5000 });
+            return `Hovered over "${selector}"`;
+        } catch (error) {
+            return `Hover failed on "${selector}": ${error instanceof Error ? error.message : error}`;
+        }
+    }
+
+    /**
+     * Wait for a specified time.
+     */
+    async wait(ms: number): Promise<string> {
+        const cappedMs = Math.min(ms, 10000); // Cap at 10 seconds
+        await this.page.waitForTimeout(cappedMs);
+        return `Waited ${cappedMs}ms`;
+    }
+
+    /**
+     * Take a screenshot (returns description, not the actual image).
+     */
+    async screenshot(): Promise<string> {
+        try {
+            const buffer = await this.page.screenshot({ type: 'png' });
+            const sizeKb = Math.round(buffer.length / 1024);
+            return `Screenshot taken (${sizeKb}KB). The page is visible in the browser window.`;
+        } catch (error) {
+            return `Screenshot failed: ${error instanceof Error ? error.message : error}`;
+        }
+    }
+
+    /**
+     * Known ARIA roles for detecting ARIA-format selectors.
+     */
+    private static readonly ARIA_ROLES = new Set([
+        'alert', 'alertdialog', 'application', 'article', 'banner',
+        'blockquote', 'button', 'caption', 'cell', 'checkbox',
+        'code', 'columnheader', 'combobox', 'complementary',
+        'contentinfo', 'definition', 'deletion', 'dialog',
+        'directory', 'document', 'emphasis', 'feed', 'figure',
+        'form', 'generic', 'grid', 'gridcell', 'group', 'heading',
+        'img', 'insertion', 'link', 'list', 'listbox', 'listitem',
+        'log', 'main', 'marquee', 'math', 'menu', 'menubar',
+        'menuitem', 'menuitemcheckbox', 'menuitemradio', 'meter',
+        'navigation', 'none', 'note', 'option', 'paragraph',
+        'presentation', 'progressbar', 'radio', 'radiogroup',
+        'region', 'row', 'rowgroup', 'rowheader', 'scrollbar',
+        'search', 'searchbox', 'separator', 'slider', 'spinbutton',
+        'status', 'strong', 'subscript', 'superscript', 'switch',
+        'tab', 'table', 'tablist', 'tabpanel', 'term', 'textbox',
+        'time', 'timer', 'toolbar', 'tooltip', 'tree', 'treegrid',
+        'treeitem',
+    ]);
+
+    /**
+     * Resolve a flexible selector to a Playwright locator.
+     * Supports (in priority order):
+     *   1. ARIA format from accessibility tree: 'button "Submit"', 'combobox "Search"'
+     *   2. Role prefix: 'role=button[name="Submit"]'
+     *   3. Text prefix: 'text=Submit'
+     *   4. Label prefix: 'label=Email'
+     *   5. Placeholder prefix: 'placeholder=Search'
+     *   6. CSS selectors: '#id', '.class', 'div > span'
+     *   7. Plain text fallback
+     */
+    private resolveLocator(selector: string) {
+        // Strip leading "- " in case the LLM copies the YAML list prefix
+        selector = selector.replace(/^-\s+/, '');
+
+        // ── 1. ARIA-format selector: role "name" ──
+        // Matches: combobox "Hae", button "Google-haku", link "Home", heading "Title" [level=1]
+        const ariaMatch = selector.match(/^(\w+)\s+"(.+)"(\s+\[.*\])?$/);
+        if (ariaMatch) {
+            const [, role, name] = ariaMatch;
+            if (BrowserActions.ARIA_ROLES.has(role.toLowerCase())) {
+                return this.page.getByRole(role.toLowerCase() as any, { name });
+            }
+        }
+
+        // Also match ARIA format without quotes: combobox Search
+        const ariaNoQuoteMatch = selector.match(/^(\w+)\s+(.+)$/);
+        if (ariaNoQuoteMatch) {
+            const [, role, name] = ariaNoQuoteMatch;
+            if (BrowserActions.ARIA_ROLES.has(role.toLowerCase()) && !name.includes('=')) {
+                return this.page.getByRole(role.toLowerCase() as any, { name });
+            }
+        }
+
+        // ── 2. Explicit role= prefix: role=button[name='Submit'] ──
+        if (selector.startsWith('role=')) {
+            const roleMatch = selector.match(/^role=(\w+)(?:\[name=['"](.+)['"]\])?$/);
+            if (roleMatch) {
+                const [, role, name] = roleMatch;
+                return name
+                    ? this.page.getByRole(role as any, { name })
+                    : this.page.getByRole(role as any);
+            }
+        }
+
+        // ── 3. Explicit text= prefix ──
+        if (selector.startsWith('text=')) {
+            return this.page.getByText(selector.slice(5));
+        }
+
+        // ── 4. Label prefix ──
+        if (selector.startsWith('label=')) {
+            return this.page.getByLabel(selector.slice(6));
+        }
+
+        // ── 5. Placeholder prefix ──
+        if (selector.startsWith('placeholder=')) {
+            return this.page.getByPlaceholder(selector.slice(12));
+        }
+
+        // ── 6. CSS selector (contains typical CSS characters) ──
+        if (/[#.\[\]>:=@]/.test(selector)) {
+            return this.page.locator(selector);
+        }
+
+        // ── 7. Plain text fallback ──
+        return this.page.getByText(selector, { exact: false });
+    }
+}
