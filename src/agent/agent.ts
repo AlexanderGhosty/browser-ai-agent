@@ -1,7 +1,7 @@
 import type { LLMProvider, ToolCall } from '../llm/types.js';
 import type { Page } from 'playwright';
 import { ContextManager } from './context.js';
-import { formatObservation } from './prompts.js';
+import { formatObservation, buildFinalSummaryPrompt } from './prompts.js';
 import { PageExtractor } from '../browser/extractor.js';
 import { ToolExecutor, type AskUserCallback } from '../tools/executor.js';
 import { SecurityGuard } from '../security/guard.js';
@@ -173,12 +173,49 @@ export class BrowserAgent {
         }
 
         if (!this.isDone) {
-            this.summary = `Task stopped after reaching maximum iterations (${this.maxIterations}).`;
-            logger.error(this.summary);
+            logger.error(`Task stopped after reaching maximum iterations (${this.maxIterations}).`);
+            // Generate a final summary from the LLM
+            this.summary = await this.generateFinalSummary(task);
         }
 
         logger.separator();
         return this.summary;
+    }
+
+    /**
+     * Generate a summary when the agent hits the iteration limit.
+     * Makes one final LLM call with only the `done` tool available.
+     */
+    private async generateFinalSummary(task: string): Promise<string> {
+        try {
+            const summaryPrompt = buildFinalSummaryPrompt(task);
+            const messages = this.context.getMessages();
+            // Append a user message asking for summary
+            messages.push({ role: 'user', content: summaryPrompt });
+
+            // Only provide the `done` tool to force a structured summary
+            const doneToolOnly = this.toolExecutor.getDefinitions().filter(t => t.function.name === 'done');
+
+            const response = await this.llm.chat(messages, doneToolOnly);
+
+            // Extract summary from tool call or text
+            if (response.toolCalls && response.toolCalls.length > 0) {
+                const args = JSON.parse(response.toolCalls[0].function.arguments);
+                const summary = args.summary || 'Task incomplete — max iterations reached.';
+                logger.done(summary);
+                return summary;
+            }
+
+            if (response.content) {
+                logger.done(response.content);
+                return response.content;
+            }
+
+            return `Task incomplete: reached ${this.maxIterations} iterations. Re-run to continue.`;
+        } catch (error) {
+            logger.error(`Failed to generate final summary: ${error instanceof Error ? error.message : error}`);
+            return `Task incomplete: reached ${this.maxIterations} iterations. Re-run to continue.`;
+        }
     }
 
     /**

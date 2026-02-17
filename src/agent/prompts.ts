@@ -30,6 +30,12 @@ Each turn you will receive the current page's accessibility tree (a YAML-like st
 - Use "ask_user" when you genuinely need clarification from the user.
 - Use "done" when the task is fully completed — include a detailed summary.
 
+## HANDLING LISTS OF SIMILAR ITEMS
+- On listing pages (search results, job boards, product catalogs, etc.), DO NOT try to click generic buttons like "Apply", "Buy", or "Откликнуться" that appear on every item — they will fail because many identical buttons exist.
+- Instead: click on the TITLE or LINK of a specific item to navigate to its DETAIL PAGE, then perform the action (apply, buy, etc.) from the detail page.
+- After completing the action on one item, use go_back and repeat for the next item.
+- This pattern is essential for job sites (hh.ru), shopping (amazon), and any listing with repeated actions.
+
 ## SELECTOR FORMAT
 Use the ARIA role and name DIRECTLY from the accessibility tree. The format is: role "name"
 
@@ -67,4 +73,20 @@ export function formatObservation(pageContent: string, iteration: number, maxIte
 export function summarizeActions(actionDescriptions: string[]): string {
     if (actionDescriptions.length === 0) return '';
     return `Previous actions taken:\n${actionDescriptions.map((a, i) => `${i + 1}. ${a}`).join('\n')}`;
+}
+
+/**
+ * Build a prompt for forcing a final summary when the agent hits the iteration limit.
+ */
+export function buildFinalSummaryPrompt(task: string): string {
+    return `You have reached the maximum number of iterations for this task.
+
+Original task: "${task}"
+
+You MUST now call the "done" tool with a comprehensive summary that includes:
+1. What you accomplished so far
+2. What remains to be done
+3. Specific suggestions for how the user can continue (e.g., re-run with a more specific task, or what to do manually)
+
+Do NOT try any more browser actions. Just summarize and call "done".`;
 }

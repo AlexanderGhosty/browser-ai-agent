@@ -46,6 +46,17 @@ export class BrowserActions {
             await this.page.waitForTimeout(800);
             return `Clicked on "${selector}" successfully`;
         } catch (error) {
+            // Handle strict mode violation — auto-pick the first visible match
+            if (error instanceof Error && error.message.includes('strict mode violation')) {
+                try {
+                    const locator = this.resolveLocator(selector);
+                    await locator.first().click({ timeout: 5000 });
+                    await this.page.waitForTimeout(800);
+                    return `Clicked on the FIRST match for "${selector}" (multiple elements found). TIP: For listing pages with many identical buttons, navigate to the individual item page first, then perform the action there.`;
+                } catch (retryError) {
+                    return `Click failed on "${selector}" (strict mode, first() also failed): ${retryError instanceof Error ? retryError.message : retryError}`;
+                }
+            }
             return `Click failed on "${selector}": ${error instanceof Error ? error.message : error}`;
         }
     }
@@ -59,6 +70,16 @@ export class BrowserActions {
             await locator.fill(text, { timeout: 5000 });
             return `Typed "${text}" into "${selector}"`;
         } catch (error) {
+            // Handle strict mode violation — auto-pick the first match
+            if (error instanceof Error && error.message.includes('strict mode violation')) {
+                try {
+                    const locator = this.resolveLocator(selector);
+                    await locator.first().fill(text, { timeout: 5000 });
+                    return `Typed "${text}" into the FIRST match for "${selector}" (multiple elements found). TIP: Use a more specific selector.`;
+                } catch (retryError) {
+                    return `Type failed on "${selector}" (strict mode, first() also failed): ${retryError instanceof Error ? retryError.message : retryError}`;
+                }
+            }
             // If fill doesn't work, try click + type
             try {
                 const locator = this.resolveLocator(selector);
@@ -137,6 +158,16 @@ export class BrowserActions {
             await locator.hover({ timeout: 5000 });
             return `Hovered over "${selector}"`;
         } catch (error) {
+            // Handle strict mode violation — auto-pick the first match
+            if (error instanceof Error && error.message.includes('strict mode violation')) {
+                try {
+                    const locator = this.resolveLocator(selector);
+                    await locator.first().hover({ timeout: 5000 });
+                    return `Hovered over the FIRST match for "${selector}" (multiple elements found). TIP: Use a more specific selector.`;
+                } catch (retryError) {
+                    return `Hover failed on "${selector}" (strict mode, first() also failed): ${retryError instanceof Error ? retryError.message : retryError}`;
+                }
+            }
             return `Hover failed on "${selector}": ${error instanceof Error ? error.message : error}`;
         }
     }
