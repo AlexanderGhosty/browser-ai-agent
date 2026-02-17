@@ -18,9 +18,12 @@ Each turn you will receive the current page's accessibility tree (a YAML-like st
 
 ## RULES
 - Call exactly ONE tool per turn. Do not call multiple tools at once.
-- NEVER hardcode URLs, selectors, or steps. Always discover them from the page content.
+- **CRITICAL**: You MUST call a tool. Do NOT respond with just text.
+- If you need user input (e.g. login credentials), use the "ask_user" tool.
+- NEVER hardcode URLs, selectors, or steps. Always discover them.
 - Be methodical: read the page carefully before acting.
 - If an element is not visible, try scrolling down to find it.
+- **IMPORTANT**: If scrolling commands (up/down) do not change the page state (scroll position stays 0px), STOP scrolling. The page might be using a virtual scroller or be non-scrollable. Try clicking elements or searching instead.
 - If a click fails, try a different selector or approach.
 - If you get stuck, try going back or navigating to a different page.
 - Use "read_page" after major state changes to see the updated page.

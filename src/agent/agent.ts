@@ -1,4 +1,4 @@
-import type { LLMProvider } from '../llm/types.js';
+import type { LLMProvider, ToolCall } from '../llm/types.js';
 import type { Page } from 'playwright';
 import { ContextManager } from './context.js';
 import { formatObservation } from './prompts.js';
@@ -6,6 +6,7 @@ import { PageExtractor } from '../browser/extractor.js';
 import { ToolExecutor, type AskUserCallback } from '../tools/executor.js';
 import { SecurityGuard } from '../security/guard.js';
 import { logger } from '../utils/logger.js';
+import { BrowserManager } from '../browser/manager.js';
 
 export interface AgentOptions {
     llm: LLMProvider;
@@ -22,19 +23,21 @@ export class BrowserAgent {
     private context: ContextManager;
     private extractor: PageExtractor;
     private toolExecutor: ToolExecutor;
+    private browserManager: BrowserManager;
     private maxIterations: number;
     private page: Page;
     private isDone: boolean = false;
     private summary: string = '';
 
-    constructor(page: Page, options: AgentOptions) {
-        this.page = page;
+    constructor(browserManager: BrowserManager, options: AgentOptions) {
+        this.browserManager = browserManager;
+        this.page = browserManager.getActivePage();
         this.llm = options.llm;
         this.maxIterations = options.maxIterations;
         this.context = new ContextManager();
         this.extractor = new PageExtractor();
         this.toolExecutor = new ToolExecutor(
-            page,
+            this.page,
             this.extractor,
             new SecurityGuard(options.askUserCallback),
             options.askUserCallback,
@@ -54,19 +57,33 @@ export class BrowserAgent {
         logger.system(`Using LLM: ${this.llm.name} (${this.llm.model})`);
         logger.separator();
 
+        let consecutiveFailures = 0;
+        let textOnlyRetries = 0;
+        const recentActions: string[] = [];
+
         for (let iteration = 1; iteration <= this.maxIterations; iteration++) {
             if (this.isDone) break;
 
             try {
-                // Ensure we're working with the current active page
-                this.toolExecutor.updatePage(this.page);
+                // ── STALE PAGE RECOVERY ──
+                // Always get the latest valid page (handles tab closes/opens)
+                try {
+                    this.page = this.browserManager.getActivePage();
+                    this.toolExecutor.updatePage(this.page);
+                } catch (e) {
+                    logger.error('No open pages found. Aborting task.');
+                    return 'Task aborted: Browser windows closed.';
+                }
 
                 // ── 1. OBSERVE ──
                 const pageContent = await this.extractor.extract(this.page);
                 const observation = formatObservation(pageContent, iteration, this.maxIterations);
 
+                let title = 'Unknown';
+                try { title = await this.page.title(); } catch { }
+
                 logger.observe(
-                    `${await this.page.title()} | ${this.page.url()} (step ${iteration}/${this.maxIterations})`
+                    `${title} | ${this.page.url()} (step ${iteration}/${this.maxIterations})`
                 );
 
                 this.context.addObservation(observation);
@@ -79,14 +96,26 @@ export class BrowserAgent {
 
                 // ── 3. ACT ──
                 if (response.toolCalls && response.toolCalls.length > 0) {
-                    // Add assistant message with tool calls to context
+                    textOnlyRetries = 0; // Reset text retry counter
                     this.context.addAssistantMessage(response.content, response.toolCalls);
 
-                    // Execute each tool call (usually just one)
+                    // Execute processing
                     for (const toolCall of response.toolCalls) {
+                        // Loop/Stuck Detection
+                        const toolDesc = `${toolCall.function.name}(${toolCall.function.arguments})`;
+                        if (this.isStuck(recentActions, toolDesc)) {
+                            const stuckMsg = `You are repeating the action "${toolCall.function.name}" with the same arguments, which seems ineffective. STOP. Try a different approach (search, tab navigation, or ask_user).`;
+                            logger.system(`⚠️ Loop detected: ${toolDesc}. Injecting warning.`);
+                            this.context.addToolResult(toolCall, stuckMsg);
+                            continue; // Skip execution, force rethink
+                        }
+                        recentActions.push(toolDesc);
+                        if (recentActions.length > 5) recentActions.shift();
+
+                        // Execute
                         const result = await this.toolExecutor.execute(toolCall, this.page);
 
-                        // Add tool result to context
+                        // Add result
                         this.context.addToolResult(toolCall, result.result);
 
                         if (result.isDone) {
@@ -95,36 +124,56 @@ export class BrowserAgent {
                             break;
                         }
                     }
+                    consecutiveFailures = 0;
                 } else if (response.content) {
-                    // Agent is speaking without tool calls — log it
+                    // LLM spoke without tools
                     logger.think(response.content);
                     this.context.addAssistantMessage(response.content);
 
-                    // Check if the model thinks we're done but didn't use the done tool
+                    // Force tool usage if strictly chatting (unless it looks like a completion)
+                    // Heuristic: if it looks like a question to user but didn't use ask_user
+                    if (response.content.includes('?') && textOnlyRetries < 2) {
+                        textOnlyRetries++;
+                        const warning = "You sent a text response but did not call a tool. If you need to ask the user a question, you MUST use the `ask_user` tool. Do not just write text. Please try again.";
+                        logger.system(`⚠️ LLM sent text only. Retrying (${textOnlyRetries}/2) with warning.`);
+                        this.context.addObservation(warning);
+                        // Decrement iteration count to not waste steps? No, keep it simple.
+                        continue;
+                    }
+
+                    // Check for "done" without tool
                     if (
                         response.finishReason === 'stop' &&
-                        response.content.toLowerCase().includes('task') &&
-                        (response.content.toLowerCase().includes('complete') ||
-                            response.content.toLowerCase().includes('done') ||
-                            response.content.toLowerCase().includes('finish'))
+                        ['task', 'complete', 'finished', 'done'].some(kw => response.content?.toLowerCase().includes(kw))
                     ) {
                         this.isDone = true;
                         this.summary = response.content;
+                    } else if (textOnlyRetries < 2) {
+                        textOnlyRetries++;
+                        this.context.addObservation("Please call a tool to proceed. Use `ask_user` if you need input, or `done` if finished.");
                     }
                 } else {
                     logger.error('LLM returned empty response — retrying...');
+                    consecutiveFailures++;
                 }
+
             } catch (error) {
                 const msg = error instanceof Error ? error.message : String(error);
                 logger.error(`Iteration ${iteration} error: ${msg}`);
+                consecutiveFailures++;
 
                 // Add error to context so the agent can adapt
-                this.context.addObservation(`Error occurred: ${msg}. Please try a different approach.`);
+                this.context.addObservation(`Error occurred: ${msg}. If the page closed, I will switch to a valid page next turn.`);
+
+                if (consecutiveFailures > 3) {
+                    this.summary = "Task failed: Too many consecutive errors.";
+                    this.isDone = true;
+                }
             }
         }
 
         if (!this.isDone) {
-            this.summary = `Task stopped after reaching maximum iterations (${this.maxIterations}). The task may not be fully complete.`;
+            this.summary = `Task stopped after reaching maximum iterations (${this.maxIterations}).`;
             logger.error(this.summary);
         }
 
@@ -133,10 +182,17 @@ export class BrowserAgent {
     }
 
     /**
-     * Update the page reference (e.g., when a new tab opens).
+     * Simple heuristic to detect if we're stuck in a loop of identical actions.
      */
-    setPage(page: Page) {
-        this.page = page;
-        this.toolExecutor.updatePage(page);
+    private isStuck(recentActions: string[], currentAction: string): boolean {
+        // If the last 2 actions are identical to the current one
+        if (recentActions.length >= 2) {
+            const last = recentActions[recentActions.length - 1];
+            const secondLast = recentActions[recentActions.length - 2];
+            if (last === currentAction && secondLast === currentAction) {
+                return true;
+            }
+        }
+        return false;
     }
 }

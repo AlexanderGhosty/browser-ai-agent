@@ -39,14 +39,15 @@ export class BrowserManager {
     }
 
     /**
-     * Get the currently active page (last focused page).
+     * Get the currently active page (last focused/created page).
+     * Filters out closed pages to prevent "Target page has been closed" errors.
      */
     getActivePage(): Page {
         if (!this.context) {
             throw new Error('Browser not launched');
         }
 
-        const pages = this.context.pages();
+        const pages = this.context.pages().filter(p => !p.isClosed());
         if (pages.length === 0) {
             throw new Error('No pages open in browser');
         }

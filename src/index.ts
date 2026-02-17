@@ -67,11 +67,8 @@ async function main() {
         return askQuestion(rl, `\n${question}\n> `);
     };
 
-    // Get the active page
-    const page = browserManager.getActivePage();
-
     // Create the agent
-    const agent = new BrowserAgent(page, {
+    const agent = new BrowserAgent(browserManager, {
         llm,
         maxIterations: config.maxIterations,
         askUserCallback,
@@ -90,10 +87,6 @@ async function main() {
         logger.separator();
 
         try {
-            // Update the page reference in case tabs changed
-            const currentPage = browserManager.getActivePage();
-            agent.setPage(currentPage);
-
             // Run the agent
             const result = await agent.run(task);
 
