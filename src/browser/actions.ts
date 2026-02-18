@@ -164,11 +164,18 @@ export class BrowserActions {
      */
     async goBack(): Promise<string> {
         try {
+            const urlBefore = this.page.url();
             await this.page.goBack({ waitUntil: 'domcontentloaded', timeout: 10000 });
             await this.page.waitForTimeout(800);
+            const urlAfter = this.page.url();
             const title = await this.page.title();
-            const url = this.page.url();
-            return `Navigated back to "${title}" (${url})`;
+
+            // Detect SPA failure: goBack() returned but URL didn't change
+            if (urlAfter === urlBefore) {
+                return `go_back did NOT work — the page is still "${title}" (${urlAfter}). This site uses client-side routing. Use navigate() with the target URL, or click a link/button to go where you need.`;
+            }
+
+            return `Navigated back to "${title}" (${urlAfter})`;
         } catch (error) {
             return `Go back failed: ${error instanceof Error ? error.message : error}`;
         }

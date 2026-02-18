@@ -12,7 +12,7 @@ export class ContextManager {
     private maxHistoryMessages: number;
     private tokenBudget: number;
 
-    constructor(maxHistoryMessages = 10, tokenBudget = 8000) {
+    constructor(maxHistoryMessages = 20, tokenBudget = 16000) {
         this.maxHistoryMessages = maxHistoryMessages;
         this.tokenBudget = tokenBudget;
     }
@@ -89,7 +89,7 @@ export class ContextManager {
 
         // Track in action history for compression
         // Preserve longer summaries for rich content (e.g., resume pages)
-        const summaryLen = result.length > 1000 ? 300 : 100;
+        const summaryLen = result.length > 1000 ? 500 : 100;
         try {
             const args = JSON.parse(toolCall.function.arguments);
             const argStr = Object.entries(args).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ');

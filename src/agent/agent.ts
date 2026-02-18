@@ -246,6 +246,7 @@ export class BrowserAgent {
      * This allows legitimate repeated actions (e.g. clicking "next" on different emails).
      */
     private isStuck(recentActions: Array<{ action: string; url: string }>, currentAction: string, currentUrl: string): boolean {
+        // Check 1: Same action on same URL repeated 3 times consecutively
         if (recentActions.length >= 2) {
             const last = recentActions[recentActions.length - 1];
             const secondLast = recentActions[recentActions.length - 2];
@@ -256,6 +257,15 @@ export class BrowserAgent {
                 return true;
             }
         }
+
+        // Check 2: URL-frequency — same page visited 4+ times in last 8 actions
+        // Catches patterns where the agent cycles through different actions on the same page
+        const relevantWindow = recentActions.slice(-7); // last 7 + current = 8
+        const urlCount = relevantWindow.filter(a => a.url === currentUrl).length + 1; // +1 for current
+        if (urlCount >= 4) {
+            return true;
+        }
+
         return false;
     }
 }
