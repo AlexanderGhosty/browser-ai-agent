@@ -58,18 +58,53 @@ export class BrowserActions {
                 }
             }
 
-            // If timeout but locator was resolved (element exists but blocked by overlay/animation),
-            // retry with force: true after a short wait for animations to finish
-            if (error instanceof Error && error.message.includes('Timeout') && error.message.includes('locator resolved')) {
+            // If timeout and locator was resolved (element exists but blocked by overlay/animation),
+            // retry with dispatchEvent('click') which fires directly on the element's JS handler,
+            // bypassing both actionability checks AND coordinate-based dispatch (no overlay issue)
+            if (error instanceof Error && error.message.includes('Timeout')) {
+                const urlBefore = this.page.url();
                 try {
                     const locator = this.resolveLocator(selector);
                     await this.page.waitForTimeout(500); // Let animations finish
                     await locator.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => { });
-                    await locator.click({ force: true, timeout: 3000 });
-                    await this.page.waitForTimeout(800);
-                    return `Clicked on "${selector}" successfully (force-click after animation wait)`;
-                } catch (forceError) {
-                    return `Click failed on "${selector}": ${error instanceof Error ? error.message : error}`;
+                    // Use dispatchEvent instead of click({force:true}) — dispatches directly
+                    // to the element without coordinate-based clicking through overlays
+                    await locator.dispatchEvent('click');
+                    await this.page.waitForTimeout(1000);
+                    const urlAfter = this.page.url();
+                    // If URL changed, the click worked
+                    if (urlAfter !== urlBefore) {
+                        return `Clicked on "${selector}" successfully (dispatchEvent fallback)`;
+                    }
+                    // URL didn't change — try evaluate fallback
+                    await locator.evaluate((el: HTMLElement) => el.click());
+                    await this.page.waitForTimeout(1000);
+                    const urlFinal = this.page.url();
+                    if (urlFinal !== urlBefore) {
+                        return `Clicked on "${selector}" successfully (evaluate fallback)`;
+                    }
+                    // For buttons (not links), click may succeed without URL change
+                    if (selector.toLowerCase().includes('button')) {
+                        return `Clicked on "${selector}" successfully (dispatchEvent on button)`;
+                    }
+                    return `Click on "${selector}" was dispatched but the page did NOT change. The element may be covered by an overlay or the selector is wrong. Try a different selector (e.g., text= with the visible text, or use read_page to find the correct element).`;
+                } catch (dispatchError) {
+                    // If even dispatchEvent fails, try .first() as last resort
+                    try {
+                        const locator = this.resolveLocator(selector);
+                        await locator.first().dispatchEvent('click');
+                        await this.page.waitForTimeout(1000);
+                        if (selector.toLowerCase().includes('button')) {
+                            return `Clicked on "${selector}" successfully (dispatchEvent on first match)`;
+                        }
+                        const urlCheck = this.page.url();
+                        if (urlCheck !== urlBefore) {
+                            return `Clicked on "${selector}" successfully (dispatchEvent on first match)`;
+                        }
+                        return `Click on "${selector}" was dispatched but the page did NOT change. Try a different selector.`;
+                    } catch (lastError) {
+                        return `Click failed on "${selector}": ${error instanceof Error ? error.message : error}`;
+                    }
                 }
             }
 
@@ -247,6 +282,16 @@ export class BrowserActions {
     private resolveLocator(selector: string) {
         // Strip leading "- " in case the LLM copies the YAML list prefix
         selector = selector.replace(/^-\s+/, '');
+
+        // Reject hallucinated tree-path selectors (e.g., "ROOT > DIV > 1", "LI > ROOT > 1")
+        // The LLM sometimes misinterprets ARIA tree indentation as CSS paths
+        if (/\bROOT\b/i.test(selector) || /^[A-Z]+\s*>\s*[A-Z]+/i.test(selector) && /\b\d+\b/.test(selector)) {
+            throw new Error(
+                `Invalid selector "${selector}" — this looks like a tree hierarchy path, not a valid selector. ` +
+                `Use ARIA role+name format instead (e.g., button "Submit", link "Home"). ` +
+                `Use read_page to see the actual element labels on the page.`
+            );
+        }
 
         // ── 0. Nested/scoped ARIA selector: parentRole "parentName" childRole "childName" ──
         // Matches: dialog "Отклик на вакансию" button "Откликнуться"
