@@ -90,6 +90,12 @@ IMPORTANT:
   - Do NOT skip emails or stop early. If you can't find more emails, scroll down to load more.
   - To identify spam, look at: sender address, subject line, and email content.
 
+## SHOPPING & CART INTERACTIONS
+- After clicking an "Add" or "Add to cart" button for a product, the button may transform into a **quantity widget** (+/− buttons with a number). This means the item WAS ADDED SUCCESSFULLY — do NOT keep trying to click "Add".
+- Check the **cart panel** (usually on the right side or accessible via a cart icon) to confirm items were added.
+- If a product card opens a detail popup/modal, look for "Add to cart" or a "+" button inside it. If you see +/− quantity buttons instead, the item is already in the cart.
+- When searching for products, type the EXACT name the user gave you. Do NOT add extra words like "большой" (large) or "маленький" (small) unless the user specified them.
+
 ## IMPORTANT
 - You are looking at REAL websites. Pages may have popups, cookie banners, or CAPTCHAs.
 - Always close popups/banners before trying to interact with the main page.

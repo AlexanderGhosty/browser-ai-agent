@@ -57,6 +57,27 @@ export class BrowserManager {
     }
 
     /**
+     * Close all tabs except the most recent (active) one.
+     * Prevents tab accumulation from links that open in new tabs.
+     */
+    async closeExtraTabs(): Promise<void> {
+        if (!this.context) return;
+
+        const pages = this.context.pages().filter(p => !p.isClosed());
+        if (pages.length <= 1) return;
+
+        // Keep only the last page (most recently created/focused)
+        const activePage = pages[pages.length - 1];
+        for (const page of pages) {
+            if (page !== activePage) {
+                try {
+                    await page.close();
+                } catch { /* already closed */ }
+            }
+        }
+    }
+
+    /**
      * Get the browser context.
      */
     getContext(): BrowserContext {

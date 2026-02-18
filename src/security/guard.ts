@@ -95,9 +95,9 @@ export class SecurityGuard {
         // For click/type/press_key actions, check if page context suggests destructive operation
         if (['click', 'type', 'press_key', 'select_option'].includes(toolName)) {
             const contextLower = pageContext.toLowerCase();
-            // For click actions, only check the first 80 chars of the selector to avoid
+            // For click actions, only check the first 50 chars of the selector to avoid
             // false positives on long email subjects containing keywords like "подтвердить"
-            const argsToCheck = toolName === 'click' ? argsStr.slice(0, 80).toLowerCase() : argsStr.toLowerCase();
+            const argsToCheck = toolName === 'click' ? argsStr.slice(0, 50).toLowerCase() : argsStr.toLowerCase();
 
             for (const keyword of DESTRUCTIVE_KEYWORDS) {
                 // Keyword in the arguments (what we're clicking/typing)

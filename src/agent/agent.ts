@@ -59,7 +59,7 @@ export class BrowserAgent {
 
         let consecutiveFailures = 0;
         let textOnlyRetries = 0;
-        const recentActions: string[] = [];
+        const recentActions: Array<{ action: string; url: string }> = [];
 
         for (let iteration = 1; iteration <= this.maxIterations; iteration++) {
             if (this.isDone) break;
@@ -113,15 +113,16 @@ export class BrowserAgent {
 
                     // Execute processing
                     for (const toolCall of response.toolCalls) {
-                        // Loop/Stuck Detection
+                        // Loop/Stuck Detection (URL-aware)
                         const toolDesc = `${toolCall.function.name}(${toolCall.function.arguments})`;
-                        if (this.isStuck(recentActions, toolDesc)) {
-                            const stuckMsg = `You are repeating the action "${toolCall.function.name}" with the same arguments, which seems ineffective. STOP. Try a different approach (search, tab navigation, or ask_user).`;
-                            logger.system(`⚠️ Loop detected: ${toolDesc}. Injecting warning.`);
+                        const currentUrl = this.page.url();
+                        if (this.isStuck(recentActions, toolDesc, currentUrl)) {
+                            const stuckMsg = `You are repeating the action "${toolCall.function.name}" with the same arguments on the same page, which seems ineffective. STOP. Try a different approach (search, tab navigation, or ask_user).`;
+                            logger.system(`⚠ Loop detected: ${toolDesc}. Injecting warning.`);
                             this.context.addToolResult(toolCall, stuckMsg);
                             continue; // Skip execution, force rethink
                         }
-                        recentActions.push(toolDesc);
+                        recentActions.push({ action: toolDesc, url: currentUrl });
                         if (recentActions.length > 5) recentActions.shift();
 
                         // Execute
@@ -129,6 +130,7 @@ export class BrowserAgent {
 
                         // Refresh page reference after every action (page may have been replaced)
                         try {
+                            await this.browserManager.closeExtraTabs();
                             this.page = this.browserManager.getActivePage();
                             this.toolExecutor.updatePage(this.page);
                         } catch { /* will be caught at start of next iteration */ }
@@ -237,14 +239,18 @@ export class BrowserAgent {
     }
 
     /**
-     * Simple heuristic to detect if we're stuck in a loop of identical actions.
+     * URL-aware loop detection.
+     * Only flags as stuck when the same action is repeated on the SAME page URL.
+     * This allows legitimate repeated actions (e.g. clicking "next" on different emails).
      */
-    private isStuck(recentActions: string[], currentAction: string): boolean {
-        // If the last 2 actions are identical to the current one
+    private isStuck(recentActions: Array<{ action: string; url: string }>, currentAction: string, currentUrl: string): boolean {
         if (recentActions.length >= 2) {
             const last = recentActions[recentActions.length - 1];
             const secondLast = recentActions[recentActions.length - 2];
-            if (last === currentAction && secondLast === currentAction) {
+            if (
+                last.action === currentAction && last.url === currentUrl &&
+                secondLast.action === currentAction && secondLast.url === currentUrl
+            ) {
                 return true;
             }
         }
