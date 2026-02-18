@@ -83,6 +83,19 @@ IMPORTANT:
   7. For confirmation dialogs ("Are you sure?", "Clear folder?"), click the CONFIRM button, not Cancel.
   8. **NEVER give up on a dialog** — keep trying different selectors until you succeed or ask the user for help.
 
+## FORM DIALOGS (Applications, Submissions, Feedback)
+- When you click "Apply" / "Откликнуться" / "Submit" / "Send", a **form dialog** usually opens with fields to fill (cover letter textarea, resume selector, dropdown, etc.).
+- The Accessibility Tree will mark open dialogs with **[OPEN DIALOG]** — always read this section first.
+- If you don't see [OPEN DIALOG], use \`read_page\` immediately to reveal the dialog contents.
+- **Workflow for form dialogs:**
+  1. Identify all input fields in the dialog (textareas, dropdowns, checkboxes).
+  2. Fill required fields — e.g., write a cover letter based on context you gathered (resume, job description).
+  3. Select the correct resume/option from dropdowns if present.
+  4. Click the **Submit/Send button INSIDE the dialog** (e.g., "Откликнуться", "Отправить", "Submit") — NOT the original trigger button on the page behind the dialog.
+  5. After submission, verify a success message appears or the dialog closes.
+- **NEVER press Escape** to dismiss a form dialog — that discards user's work. Only press Escape for cookie banners or unrelated popups.
+- If you cannot fill a required field (e.g., need user credentials), use \`ask_user\` rather than closing the dialog.
+
 ## READING EMAILS
 - Email clients use a **list → detail** pattern: the inbox shows a LIST of emails, you must click a subject to open the DETAIL VIEW to read it. You CANNOT read email content from the inbox list.
 - **Follow this exact 2-phase approach:**

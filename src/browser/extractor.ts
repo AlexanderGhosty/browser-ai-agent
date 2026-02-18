@@ -56,6 +56,29 @@ export class PageExtractor {
                 ariaTree = await withTimeout(this.fallbackExtract(page), 10000, '[Page content unavailable]');
             }
 
+            // Prioritize open dialogs/modals — their content is most actionable
+            // and gets truncated on content-heavy pages
+            try {
+                const dialogLocator = page.locator('[role="dialog"], dialog[open], [aria-modal="true"]').first();
+                const dialogVisible = await withTimeout(
+                    dialogLocator.isVisible(),
+                    3000,
+                    false,
+                );
+                if (dialogVisible) {
+                    const dialogContent = await withTimeout(
+                        dialogLocator.ariaSnapshot({ timeout: 5000 }),
+                        7000,
+                        '',
+                    );
+                    if (dialogContent) {
+                        ariaTree = `[OPEN DIALOG — interact with this first]\n${dialogContent}\n[END DIALOG]\n\n${ariaTree}`;
+                    }
+                }
+            } catch {
+                // Dialog detection failed — continue with regular tree
+            }
+
             // Truncate to token budget
             const truncated = this.truncateToTokenBudget(ariaTree);
 

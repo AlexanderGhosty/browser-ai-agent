@@ -88,25 +88,55 @@ export class ContextManager {
         });
 
         // Track in action history for compression
+        // Preserve longer summaries for rich content (e.g., resume pages)
+        const summaryLen = result.length > 1000 ? 300 : 100;
         try {
             const args = JSON.parse(toolCall.function.arguments);
             const argStr = Object.entries(args).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ');
-            this.actionHistory.push(`${toolCall.function.name}(${argStr}) → ${result.slice(0, 100)}`);
+            this.actionHistory.push(`${toolCall.function.name}(${argStr}) → ${result.slice(0, summaryLen)}`);
         } catch {
-            this.actionHistory.push(`${toolCall.function.name} → ${result.slice(0, 100)}`);
+            this.actionHistory.push(`${toolCall.function.name} → ${result.slice(0, summaryLen)}`);
         }
     }
 
     /**
+     * Remove the last observation (user message) from context.
+     * Used during error recovery to avoid orphaned observations.
+     */
+    removeLastObservation() {
+        for (let i = this.messages.length - 1; i >= 0; i--) {
+            if (this.messages[i].role === 'user') {
+                this.messages.splice(i, 1);
+                return;
+            }
+        }
+    }
+
+    /**
+     * Find a safe start index for the sliding window.
+     * OpenAI requires every 'tool' message to follow an 'assistant' message
+     * with tool_calls. Never start the window on a 'tool' message.
+     */
+    private findSafeWindowStart(targetStart: number): number {
+        let start = targetStart;
+        while (start > 0 && this.messages[start].role === 'tool') {
+            start--;
+        }
+        return start;
+    }
+
+    /**
      * Get recent messages within the sliding window.
+     * Ensures the window never splits assistant(tool_calls) from tool results.
      */
     private getRecentMessages(): Message[] {
         if (this.messages.length <= this.maxHistoryMessages) {
             return [...this.messages];
         }
 
-        // Keep the last N messages
-        return this.messages.slice(-this.maxHistoryMessages);
+        const targetStart = this.messages.length - this.maxHistoryMessages;
+        const safeStart = this.findSafeWindowStart(targetStart);
+        return this.messages.slice(safeStart);
     }
 
     /**
@@ -117,9 +147,10 @@ export class ContextManager {
         const totalTokens = this.estimateTokens(this.messages);
 
         if (totalTokens > this.tokenBudget && this.messages.length > this.maxHistoryMessages) {
-            // Move older messages to action history summary
-            const toCompress = this.messages.slice(0, this.messages.length - this.maxHistoryMessages);
-            this.messages = this.messages.slice(-this.maxHistoryMessages);
+            // Find safe cut point that doesn't split tool_calls from tool results
+            const targetStart = this.messages.length - this.maxHistoryMessages;
+            const safeStart = this.findSafeWindowStart(targetStart);
+            this.messages = this.messages.slice(safeStart);
 
             // Already tracked in actionHistory via addToolResult, so we just trim messages
         }

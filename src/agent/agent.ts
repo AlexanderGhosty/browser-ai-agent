@@ -182,8 +182,10 @@ export class BrowserAgent {
                 logger.error(`Iteration ${iteration} error: ${msg}`);
                 consecutiveFailures++;
 
-                // Add error to context so the agent can adapt
-                this.context.addObservation(`Error occurred: ${msg}. If the page closed, I will switch to a valid page next turn.`);
+                // Remove the observation we already added this iteration
+                // to avoid orphaned user messages when the LLM call fails.
+                // The next iteration will add a fresh observation automatically.
+                this.context.removeLastObservation();
 
                 if (consecutiveFailures > 3) {
                     this.summary = "Task failed: Too many consecutive errors.";
