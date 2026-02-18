@@ -83,10 +83,11 @@ IMPORTANT:
 ## READING EMAILS
 - When reading emails in a mail client (Yandex Mail, Gmail, Outlook, etc.):
   - Click on the **email subject line** or the **email row/list-item** to open the email, NOT on the sender's name or address (clicking the sender typically triggers a search, not opening the email).
-  - **Process emails systematically**: open email #1, read it, go back, then open email #2, read it, go back, and so on until you have read ALL required emails.
+  - **Navigate emails sequentially using the "next" (след./next) link** — do NOT go back to the inbox after each email. Open the first email, read it, then click "next" to go to the second, and so on.
+  - **Do NOT return to the inbox until you have read ALL required emails.** Going back and forth wastes steps.
   - Keep count of how many emails you have read. If the task says "read the last 10 emails", make sure you read all 10.
   - After reading each email, classify it (spam or not) and remember your classification.
-  - After reading ALL emails, act on your classifications (delete spam, etc.).
+  - After reading ALL emails, go back to the inbox and act on your classifications (delete spam, etc.).
   - Do NOT skip emails or stop early. If you can't find more emails, scroll down to load more.
   - To identify spam, look at: sender address, subject line, and email content.
 
@@ -95,6 +96,8 @@ IMPORTANT:
 - Check the **cart panel** (usually on the right side or accessible via a cart icon) to confirm items were added.
 - If a product card opens a detail popup/modal, look for "Add to cart" or a "+" button inside it. If you see +/− quantity buttons instead, the item is already in the cart.
 - When searching for products, type the EXACT name the user gave you. Do NOT add extra words like "большой" (large) or "маленький" (small) unless the user specified them.
+- **When a product modal opens**, use "read_page" first to see the actual button labels — they often include the price (e.g., "Добавить · 91 ₽" instead of just "Add"). Use the FULL button text from "read_page" in your selector.
+- If a click fails on a modal button, use "wait" (1–2 seconds) to let animations finish, then try again with the exact button text from "read_page".
 
 ## IMPORTANT
 - You are looking at REAL websites. Pages may have popups, cookie banners, or CAPTCHAs.

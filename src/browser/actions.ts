@@ -42,7 +42,7 @@ export class BrowserActions {
     async click(selector: string): Promise<string> {
         try {
             const locator = this.resolveLocator(selector);
-            await locator.click({ timeout: 5000 });
+            await locator.click({ timeout: 7000 });
             await this.page.waitForTimeout(800);
             return `Clicked on "${selector}" successfully`;
         } catch (error) {
@@ -50,13 +50,29 @@ export class BrowserActions {
             if (error instanceof Error && error.message.includes('strict mode violation')) {
                 try {
                     const locator = this.resolveLocator(selector);
-                    await locator.first().click({ timeout: 5000 });
+                    await locator.first().click({ timeout: 7000 });
                     await this.page.waitForTimeout(800);
                     return `Clicked on the FIRST match for "${selector}" (multiple elements found). TIP: For listing pages with many identical buttons, navigate to the individual item page first, then perform the action there.`;
                 } catch (retryError) {
                     return `Click failed on "${selector}" (strict mode, first() also failed): ${retryError instanceof Error ? retryError.message : retryError}`;
                 }
             }
+
+            // If timeout but locator was resolved (element exists but blocked by overlay/animation),
+            // retry with force: true after a short wait for animations to finish
+            if (error instanceof Error && error.message.includes('Timeout') && error.message.includes('locator resolved')) {
+                try {
+                    const locator = this.resolveLocator(selector);
+                    await this.page.waitForTimeout(500); // Let animations finish
+                    await locator.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => { });
+                    await locator.click({ force: true, timeout: 3000 });
+                    await this.page.waitForTimeout(800);
+                    return `Clicked on "${selector}" successfully (force-click after animation wait)`;
+                } catch (forceError) {
+                    return `Click failed on "${selector}": ${error instanceof Error ? error.message : error}`;
+                }
+            }
+
             return `Click failed on "${selector}": ${error instanceof Error ? error.message : error}`;
         }
     }
