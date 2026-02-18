@@ -52,6 +52,11 @@ export class GLMProvider implements LLMProvider {
                 content: choice.message.content,
                 toolCalls: toolCalls && toolCalls.length > 0 ? toolCalls : null,
                 finishReason: choice.finish_reason,
+                usage: response.usage ? {
+                    prompt_tokens: response.usage.prompt_tokens,
+                    completion_tokens: response.usage.completion_tokens,
+                    total_tokens: response.usage.total_tokens,
+                } : undefined,
             };
         } catch (error) {
             const msg = error instanceof Error ? error.message : String(error);

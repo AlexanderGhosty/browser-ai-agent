@@ -47,6 +47,11 @@ export interface LLMResponse {
     content: string | null;
     toolCalls: ToolCall[] | null;
     finishReason: string | null;
+    usage?: {
+        prompt_tokens: number;
+        completion_tokens: number;
+        total_tokens: number;
+    };
 }
 
 // ── Provider interface ──

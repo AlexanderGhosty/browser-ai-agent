@@ -101,6 +101,11 @@ export class BrowserAgent {
 
                 const response = await this.llm.chat(messages, tools);
 
+                if (response.usage) {
+                    const { prompt_tokens, completion_tokens, total_tokens } = response.usage;
+                    logger.system(`Token Usage: Prompt ${prompt_tokens} + Completion ${completion_tokens} = ${total_tokens}`);
+                }
+
                 // ── 3. ACT ──
                 if (response.toolCalls && response.toolCalls.length > 0) {
                     textOnlyRetries = 0; // Reset text retry counter

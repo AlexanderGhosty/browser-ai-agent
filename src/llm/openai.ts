@@ -11,7 +11,7 @@ export class OpenAIProvider implements LLMProvider {
     readonly model: string;
     private client: OpenAI;
 
-    constructor(apiKey: string, model = 'gpt-4o') {
+    constructor(apiKey: string, model = 'gpt-5-mini') {
         this.model = model;
         this.client = new OpenAI({ apiKey });
     }
@@ -21,7 +21,7 @@ export class OpenAIProvider implements LLMProvider {
             const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {
                 model: this.model,
                 messages: messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
-                temperature: 0.3,
+                // temperature: 0.3,
             };
 
             if (tools.length > 0) {
@@ -49,6 +49,11 @@ export class OpenAIProvider implements LLMProvider {
                 content: choice.message.content,
                 toolCalls: toolCalls && toolCalls.length > 0 ? toolCalls : null,
                 finishReason: choice.finish_reason,
+                usage: response.usage ? {
+                    prompt_tokens: response.usage.prompt_tokens,
+                    completion_tokens: response.usage.completion_tokens,
+                    total_tokens: response.usage.total_tokens,
+                } : undefined,
             };
         } catch (error) {
             const msg = error instanceof Error ? error.message : String(error);
