@@ -122,6 +122,12 @@ export class BrowserAgent {
                         // Execute
                         const result = await this.toolExecutor.execute(toolCall, this.page);
 
+                        // Refresh page reference after every action (page may have been replaced)
+                        try {
+                            this.page = this.browserManager.getActivePage();
+                            this.toolExecutor.updatePage(this.page);
+                        } catch { /* will be caught at start of next iteration */ }
+
                         // Add result
                         this.context.addToolResult(toolCall, result.result);
 

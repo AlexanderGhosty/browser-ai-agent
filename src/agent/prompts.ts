@@ -56,6 +56,25 @@ IMPORTANT:
 - Do NOT wrap with extra syntax — just use the role and name as-is
 - If text/role selector fails, try: text=Label, placeholder=Placeholder, or CSS like "#id"
 
+## STARTING A NEW TASK / NAVIGATING TO A SITE
+- When you start a task and the current page is chrome://new-tab-page/, about:blank, or ANY page unrelated to the task, you MUST use the \`navigate\` tool with the target URL.
+- **NEVER click on shortcut tiles, bookmarks, or links on the new-tab page** — they are irrelevant to the task and will take you to the wrong site.
+- Example: If the task is "Find the metro schedule", use navigate({"url":"https://www.google.com"}) or navigate({"url":"https://mosmetro.ru"}) — do NOT click on "hh.ru" or any other shortcut.
+
+## WORKING WITH MODAL DIALOGS / POPUPS
+- When a modal dialog or overlay opens (e.g., an "Apply" dialog on a job site, a confirmation popup, a form overlay):
+  1. Read ALL elements in the dialog carefully before acting.
+  2. Look for dropdowns, radio buttons, or selectors (e.g., resume selection, cover letter option).
+  3. If you need to select an option but can't find the right selector, use \`read_page\` to see the full dialog contents, then try again.
+  4. **NEVER click "Cancel" / "Отмена" / "Close"** unless the user explicitly asked you to cancel. If you're confused, use \`ask_user\` instead.
+  5. Complete the dialog (click Submit / Apply / Confirm) after filling all required fields.
+
+## READING EMAILS
+- When reading emails in a mail client (Yandex Mail, Gmail, Outlook, etc.):
+  - Click on the **email subject line** or the **email row/list-item** to open the email, NOT on the sender's name or address (clicking the sender typically triggers a search, not opening the email).
+  - Read each email individually by clicking to open it, reading the content, then going back.
+  - To identify spam, look at: sender address, subject line, and email content.
+
 ## IMPORTANT
 - You are looking at REAL websites. Pages may have popups, cookie banners, or CAPTCHAs.
 - Always close popups/banners before trying to interact with the main page.

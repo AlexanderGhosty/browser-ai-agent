@@ -115,6 +115,11 @@ process.on('SIGINT', async () => {
 });
 
 process.on('unhandledRejection', (error) => {
+    // Suppress harmless Playwright noise from orphaned promises on closed pages
+    const msg = String(error);
+    if (msg.includes('Frame has been detached') || msg.includes('Target page, context or browser has been closed')) {
+        return;
+    }
     logger.error(`Unhandled rejection: ${error}`);
 });
 

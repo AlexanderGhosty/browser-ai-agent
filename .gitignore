@@ -4,3 +4,4 @@ dist/
 user_data/
 *.log
 example_flows/
+.etc/
