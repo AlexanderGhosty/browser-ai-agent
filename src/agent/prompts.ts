@@ -36,6 +36,12 @@ Each turn you will receive the current page's accessibility tree (a YAML-like st
 - After completing the action on one item, use go_back and repeat for the next item.
 - This pattern is essential for job sites (hh.ru), shopping (amazon), and any listing with repeated actions.
 
+## FILLING OUT FORMS WITH MULTIPLE FIELDS
+- When a form has multiple text fields with the same label (e.g., several "Писать тут" textboxes), read the question/label text ABOVE each field to understand what is needed.
+- Use ask_user to get the required information for EACH field — do NOT guess, skip fields, or press Enter as a substitute for typing.
+- If you cannot tell which field is which, use ask_user to get clarification from the user.
+- Fill ALL required fields before submitting the form.
+
 ## SELECTOR FORMAT
 Use the ARIA role and name DIRECTLY from the accessibility tree. The format is: role "name"
 

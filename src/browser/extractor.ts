@@ -2,6 +2,16 @@ import type { Page } from 'playwright';
 import { logger } from '../utils/logger.js';
 
 /**
+ * Race a promise against a timeout. Prevents indefinite hangs on slow pages.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+    ]);
+}
+
+/**
  * Extracts page content using Playwright's ARIA snapshot.
  * The ARIA tree is a compact YAML representation of the accessibility tree,
  * which is far more token-efficient than raw HTML.
@@ -18,32 +28,51 @@ export class PageExtractor {
      */
     async extract(page: Page): Promise<string> {
         try {
+            // Wait for at least DOM content before attempting extraction.
+            // Use withTimeout to avoid hanging on pages that never finish loading.
+            await withTimeout(
+                page.waitForLoadState('domcontentloaded').catch(() => { }),
+                10000,
+                undefined,
+            );
+
             const url = page.url();
-            const title = await page.title();
+            const title = await withTimeout(page.title(), 5000, 'Loading...');
 
             // Get ARIA accessibility tree snapshot
             let ariaTree: string;
             try {
-                ariaTree = await page.locator('body').ariaSnapshot({ timeout: 10000 });
+                ariaTree = await withTimeout(
+                    page.locator('body').ariaSnapshot({ timeout: 10000 }),
+                    15000, // outer guard in case ariaSnapshot timeout itself hangs
+                    '',
+                );
+                if (!ariaTree) {
+                    throw new Error('ARIA snapshot returned empty');
+                }
             } catch {
                 // Fallback: extract text content if ARIA snapshot fails
                 logger.system('ARIA snapshot failed, falling back to text extraction');
-                ariaTree = await this.fallbackExtract(page);
+                ariaTree = await withTimeout(this.fallbackExtract(page), 10000, '[Page content unavailable]');
             }
 
             // Truncate to token budget
             const truncated = this.truncateToTokenBudget(ariaTree);
 
             // Get scroll position info
-            const scrollInfo = await page.evaluate(() => {
-                const scrollY = window.scrollY;
-                const totalHeight = document.documentElement.scrollHeight;
-                const viewportHeight = window.innerHeight;
-                const scrollPercent = totalHeight > viewportHeight
-                    ? Math.round((scrollY / (totalHeight - viewportHeight)) * 100)
-                    : 100;
-                return `Scroll: ${scrollPercent}% (${Math.round(scrollY)}px / ${totalHeight}px total)`;
-            });
+            const scrollInfo = await withTimeout(
+                page.evaluate(() => {
+                    const scrollY = window.scrollY;
+                    const totalHeight = document.documentElement.scrollHeight;
+                    const viewportHeight = window.innerHeight;
+                    const scrollPercent = totalHeight > viewportHeight
+                        ? Math.round((scrollY / (totalHeight - viewportHeight)) * 100)
+                        : 100;
+                    return `Scroll: ${scrollPercent}% (${Math.round(scrollY)}px / ${totalHeight}px total)`;
+                }),
+                5000,
+                'Scroll: unknown',
+            );
 
             return [
                 `Page: ${title}`,

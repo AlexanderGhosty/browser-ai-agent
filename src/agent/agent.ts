@@ -80,7 +80,14 @@ export class BrowserAgent {
                 const observation = formatObservation(pageContent, iteration, this.maxIterations);
 
                 let title = 'Unknown';
-                try { title = await this.page.title(); } catch { }
+                try {
+                    title = await Promise.race([
+                        this.page.title(),
+                        new Promise<string>((_, reject) =>
+                            setTimeout(() => reject(new Error('title timeout')), 5000)
+                        ),
+                    ]);
+                } catch { }
 
                 logger.observe(
                     `${title} | ${this.page.url()} (step ${iteration}/${this.maxIterations})`
