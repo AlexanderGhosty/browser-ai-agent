@@ -232,6 +232,20 @@ export class BrowserActions {
         // Strip leading "- " in case the LLM copies the YAML list prefix
         selector = selector.replace(/^-\s+/, '');
 
+        // ── 0. Nested/scoped ARIA selector: parentRole "parentName" childRole "childName" ──
+        // Matches: dialog "Отклик на вакансию" button "Откликнуться"
+        const nestedMatch = selector.match(/^(\w+)\s+"(.+?)"\s+(\w+)\s+"(.+)"$/);
+        if (nestedMatch) {
+            const [, parentRole, parentName, childRole, childName] = nestedMatch;
+            if (
+                BrowserActions.ARIA_ROLES.has(parentRole.toLowerCase()) &&
+                BrowserActions.ARIA_ROLES.has(childRole.toLowerCase())
+            ) {
+                const parent = this.page.getByRole(parentRole.toLowerCase() as any, { name: parentName });
+                return parent.getByRole(childRole.toLowerCase() as any, { name: childName });
+            }
+        }
+
         // ── 1. ARIA-format selector: role "name" ──
         // Matches: combobox "Hae", button "Google-haku", link "Home", heading "Title" [level=1]
         const ariaMatch = selector.match(/^(\w+)\s+"(.+)"(\s+\[.*\])?$/);

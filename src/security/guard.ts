@@ -23,7 +23,8 @@ const DESTRUCTIVE_KEYWORDS = [
  */
 const DESTRUCTIVE_TOOL_PATTERNS: Array<{ tool: string; argPattern: RegExp }> = [
     // Click on something related to payment/deletion/submission
-    { tool: 'click', argPattern: /удалить|delete|pay|оплат|submit|отправ|купить|buy|checkout|заказ|order|confirm|подтверд/i },
+    // Note: 'подтверд/confirm' removed — too many false positives on email subjects containing these words
+    { tool: 'click', argPattern: /удалить|delete|pay|оплат|submit|отправ|купить|buy|checkout|заказ|order/i },
     { tool: 'press_key', argPattern: /Enter/i }, // Enter on a form might submit it — check page context
 ];
 
@@ -83,7 +84,10 @@ export class SecurityGuard {
     private isDestructiveAction(toolName: string, argsStr: string, pageContext: string): boolean {
         // Check tool-specific patterns
         for (const pattern of DESTRUCTIVE_TOOL_PATTERNS) {
-            if (toolName === pattern.tool && pattern.argPattern.test(argsStr)) {
+            // For click actions, only check the beginning of the selector to avoid
+            // false positives when email subject text contains destructive keywords
+            const argsToTest = (toolName === 'click') ? argsStr.slice(0, 50) : argsStr;
+            if (toolName === pattern.tool && pattern.argPattern.test(argsToTest)) {
                 return true;
             }
         }
@@ -91,11 +95,13 @@ export class SecurityGuard {
         // For click/type/press_key actions, check if page context suggests destructive operation
         if (['click', 'type', 'press_key', 'select_option'].includes(toolName)) {
             const contextLower = pageContext.toLowerCase();
-            const argsLower = argsStr.toLowerCase();
+            // For click actions, only check the first 80 chars of the selector to avoid
+            // false positives on long email subjects containing keywords like "подтвердить"
+            const argsToCheck = toolName === 'click' ? argsStr.slice(0, 80).toLowerCase() : argsStr.toLowerCase();
 
             for (const keyword of DESTRUCTIVE_KEYWORDS) {
                 // Keyword in the arguments (what we're clicking/typing)
-                if (argsLower.includes(keyword)) {
+                if (argsToCheck.includes(keyword)) {
                     return true;
                 }
                 // Keyword in page context AND we're clicking something

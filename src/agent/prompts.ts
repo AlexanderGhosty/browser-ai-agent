@@ -3,7 +3,7 @@
  */
 
 export function buildSystemPrompt(task: string): string {
-    return `You are an autonomous AI browser agent. You control a real web browser to complete tasks for the user.
+  return `You are an autonomous AI browser agent. You control a real web browser to complete tasks for the user.
 
 ## YOUR WORKFLOW
 Each turn you will receive the current page's accessibility tree (a YAML-like structure showing elements on the page). Based on this, you must:
@@ -41,6 +41,8 @@ Each turn you will receive the current page's accessibility tree (a YAML-like st
 - Use ask_user to get the required information for EACH field — do NOT guess, skip fields, or press Enter as a substitute for typing.
 - If you cannot tell which field is which, use ask_user to get clarification from the user.
 - Fill ALL required fields before submitting the form.
+- **IMPORTANT**: On job application pages (like hh.ru), there may be ADDITIONAL QUESTIONS beyond the cover letter. Scroll down to see ALL fields. Fill every required field or use ask_user to get the answer. Do NOT submit until all fields are filled.
+- After filling all fields, scroll down to find and click the final Submit button.
 
 ## SELECTOR FORMAT
 Use the ARIA role and name DIRECTLY from the accessibility tree. The format is: role "name"
@@ -55,6 +57,8 @@ IMPORTANT:
 - Do NOT include the leading "- " from the tree — just the role and "name"
 - Do NOT wrap with extra syntax — just use the role and name as-is
 - If text/role selector fails, try: text=Label, placeholder=Placeholder, or CSS like "#id"
+- **Nested selectors**: To click a button INSIDE a dialog, use: \`dialog "Dialog Title" button "Button Name"\`. This scopes the search to only the dialog.
+  - Example: \`dialog "Отклик на вакансию" button "Откликнуться"\`
 
 ## STARTING A NEW TASK / NAVIGATING TO A SITE
 - When you start a task and the current page is chrome://new-tab-page/, about:blank, or ANY page unrelated to the task, you MUST use the \`navigate\` tool with the target URL.
@@ -68,11 +72,22 @@ IMPORTANT:
   3. If you need to select an option but can't find the right selector, use \`read_page\` to see the full dialog contents, then try again.
   4. **NEVER click "Cancel" / "Отмена" / "Close"** unless the user explicitly asked you to cancel. If you're confused, use \`ask_user\` instead.
   5. Complete the dialog (click Submit / Apply / Confirm) after filling all required fields.
+  6. If the submit/confirm button click fails (timeout), try these fallbacks IN ORDER:
+     a. Use \`read_page\` to see the ACTUAL elements in the dialog — the dialog may not use standard ARIA roles.
+     b. Try \`press_key Enter\` — confirmation buttons are often focused by default in modal dialogs.
+     c. Try a CSS selector targeting the button, e.g. \`css=.modal button\`, \`css=[data-qa='confirm']\`, or \`css=button >> text=Очистить\`.
+     d. Try \`alertdialog\` instead of \`dialog\` as the parent role: \`alertdialog "Title" button "Confirm"\`.
+  7. For confirmation dialogs ("Are you sure?", "Clear folder?"), click the CONFIRM button, not Cancel.
+  8. **NEVER give up on a dialog** — keep trying different selectors until you succeed or ask the user for help.
 
 ## READING EMAILS
 - When reading emails in a mail client (Yandex Mail, Gmail, Outlook, etc.):
   - Click on the **email subject line** or the **email row/list-item** to open the email, NOT on the sender's name or address (clicking the sender typically triggers a search, not opening the email).
-  - Read each email individually by clicking to open it, reading the content, then going back.
+  - **Process emails systematically**: open email #1, read it, go back, then open email #2, read it, go back, and so on until you have read ALL required emails.
+  - Keep count of how many emails you have read. If the task says "read the last 10 emails", make sure you read all 10.
+  - After reading each email, classify it (spam or not) and remember your classification.
+  - After reading ALL emails, act on your classifications (delete spam, etc.).
+  - Do NOT skip emails or stop early. If you can't find more emails, scroll down to load more.
   - To identify spam, look at: sender address, subject line, and email content.
 
 ## IMPORTANT
@@ -89,22 +104,22 @@ ${task}`;
  * Format the observation message for the LLM.
  */
 export function formatObservation(pageContent: string, iteration: number, maxIterations: number): string {
-    return `[Step ${iteration}/${maxIterations}]\n\nCurrent page state:\n${pageContent}`;
+  return `[Step ${iteration}/${maxIterations}]\n\nCurrent page state:\n${pageContent}`;
 }
 
 /**
  * Create an action summary from history for context compression.
  */
 export function summarizeActions(actionDescriptions: string[]): string {
-    if (actionDescriptions.length === 0) return '';
-    return `Previous actions taken:\n${actionDescriptions.map((a, i) => `${i + 1}. ${a}`).join('\n')}`;
+  if (actionDescriptions.length === 0) return '';
+  return `Previous actions taken:\n${actionDescriptions.map((a, i) => `${i + 1}. ${a}`).join('\n')}`;
 }
 
 /**
  * Build a prompt for forcing a final summary when the agent hits the iteration limit.
  */
 export function buildFinalSummaryPrompt(task: string): string {
-    return `You have reached the maximum number of iterations for this task.
+  return `You have reached the maximum number of iterations for this task.
 
 Original task: "${task}"
 
