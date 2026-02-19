@@ -91,7 +91,7 @@ src/
 
 | Variable | Default | Description |
 |---|---|---|
-| `LLM_PROVIDER` | `glm` | LLM provider: `glm`, `openai`, `claude` |
+| `LLM_PROVIDER` | `glm` | LLM provider: `glm`, `openai` (`claude` not yet implemented) |
 | `GLM_API_KEY` | — | Z.ai API key |
 | `OPENAI_API_KEY` | — | OpenAI API key |
 | `ANTHROPIC_API_KEY` | — | Anthropic API key |

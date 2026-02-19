@@ -5,15 +5,28 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 export type LLMProviderType = 'glm' | 'openai' | 'claude';
 
+/**
+ * Application configuration derived from environment variables.
+ */
 export interface Config {
+    /** Which LLM backend to use. */
     llmProvider: LLMProviderType;
+    /** API key for Z.ai GLM (required when llmProvider is 'glm'). */
     glmApiKey: string;
+    /** API key for OpenAI (required when llmProvider is 'openai'). */
     openaiApiKey: string;
+    /** API key for Anthropic (reserved for future Claude support). */
     anthropicApiKey: string;
+    /** Maximum number of observe→think→act iterations before the agent gives up. */
     maxIterations: number;
+    /** Path to the Chromium persistent user-data directory. */
     userDataDir: string;
 }
 
+/**
+ * Load and validate configuration from environment variables.
+ * Throws if a required API key is missing for the selected provider.
+ */
 export function loadConfig(): Config {
     const provider = (process.env.LLM_PROVIDER || 'glm') as LLMProviderType;
 

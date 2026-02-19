@@ -111,7 +111,7 @@ export class BrowserAgent {
                     textOnlyRetries = 0; // Reset text retry counter
                     this.context.addAssistantMessage(response.content, response.toolCalls);
 
-                    // Execute processing
+                    // Execute tool calls in sequence
                     for (const toolCall of response.toolCalls) {
                         // Loop/Stuck Detection (URL-aware)
                         const toolDesc = `${toolCall.function.name}(${toolCall.function.arguments})`;
@@ -123,7 +123,7 @@ export class BrowserAgent {
                             continue; // Skip execution, force rethink
                         }
                         recentActions.push({ action: toolDesc, url: currentUrl });
-                        if (recentActions.length > 5) recentActions.shift();
+                        if (recentActions.length > 10) recentActions.shift();
 
                         // Execute
                         const result = await this.toolExecutor.execute(toolCall, this.page);
@@ -246,7 +246,7 @@ export class BrowserAgent {
      * This allows legitimate repeated actions (e.g. clicking "next" on different emails).
      */
     private isStuck(recentActions: Array<{ action: string; url: string }>, currentAction: string, currentUrl: string): boolean {
-        // Check 1: Same action on same URL repeated 3 times consecutively
+        // Check 1: Exact repetition (3 times same action on same URL)
         if (recentActions.length >= 2) {
             const last = recentActions[recentActions.length - 1];
             const secondLast = recentActions[recentActions.length - 2];
@@ -258,11 +258,22 @@ export class BrowserAgent {
             }
         }
 
-        // Check 2: URL-frequency — same page visited 4+ times in last 8 actions
-        // Catches patterns where the agent cycles through different actions on the same page
-        const relevantWindow = recentActions.slice(-7); // last 7 + current = 8
-        const urlCount = relevantWindow.filter(a => a.url === currentUrl).length + 1; // +1 for current
-        if (urlCount >= 4) {
+        // Check 2: Oscillating loop detection (re-entering same URL repeatedly)
+        // We look at the combined history of recent actions plus the current one.
+        const allActions = [...recentActions, { action: currentAction, url: currentUrl }];
+
+        let visits = 0;
+        for (let i = 0; i < allActions.length; i++) {
+            if (allActions[i].url === currentUrl) {
+                // Count a visit if it's the first action in the window OR if the previous URL was different
+                if (i === 0 || allActions[i - 1].url !== currentUrl) {
+                    visits++;
+                }
+            }
+        }
+
+        // If the agent has RE-ENTERED the same page 3 or more times, it's likely stuck in a loop
+        if (visits >= 3) {
             return true;
         }
 

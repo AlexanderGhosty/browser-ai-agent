@@ -39,6 +39,9 @@ export class ToolExecutor {
         this.askUserCallback = askUserCallback;
     }
 
+    /**
+     * Update the internal page reference after navigation or tab changes.
+     */
     updatePage(page: Page) {
         this.actions.setPage(page);
     }

@@ -12,6 +12,9 @@ export class BrowserActions {
         this.page = page;
     }
 
+    /**
+     * Update the page reference (called after navigations or tab switches).
+     */
     setPage(page: Page) {
         this.page = page;
     }
