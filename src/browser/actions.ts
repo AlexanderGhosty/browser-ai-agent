@@ -4,6 +4,12 @@ import { logger } from '../utils/logger.js';
 /**
  * Low-level browser action wrappers with error handling.
  * Each action returns a string result suitable for sending back to the LLM.
+ * 
+ * Features:
+ * - Robust selector resolution (ARIA, text, CSS).
+ * - Automatic retries for "strict mode" violations (ambiguous selectors).
+ * - Fallback strategies for difficult clicks (dispatchEvent).
+ * - Descriptive success/failure messages for the LLM.
  */
 export class BrowserActions {
     private page: Page;
@@ -280,14 +286,18 @@ export class BrowserActions {
 
     /**
      * Resolve a flexible selector to a Playwright locator.
-     * Supports (in priority order):
-     *   1. ARIA format from accessibility tree: 'button "Submit"', 'combobox "Search"'
-     *   2. Role prefix: 'role=button[name="Submit"]'
-     *   3. Text prefix: 'text=Submit'
-     *   4. Label prefix: 'label=Email'
-     *   5. Placeholder prefix: 'placeholder=Search'
-     *   6. CSS selectors: '#id', '.class', 'div > span'
-     *   7. Plain text fallback
+     * 
+     * Strategy:
+     * 1. Detect and reject invalid "tree path" selectors (e.g. ROOT > DIV).
+     * 2. Check for nested ARIA selectors (dialog "Title" button "Submit").
+     * 3. Check for standard ARIA selectors (role "name").
+     * 4. specific prefixes: role=, text=, label=, placeholder=.
+     * 5. CSS selectors (fallback).
+     * 6. Plain text fuzzy match (last resort).
+     * 
+     * @param selector - The selector string provided by the LLM
+     * @returns Playwright Locator
+     * @throws Error if selector is clearly invalid (hallucinated tree path)
      */
     private resolveLocator(selector: string) {
         // Strip leading "- " in case the LLM copies the YAML list prefix

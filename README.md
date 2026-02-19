@@ -8,7 +8,7 @@ An autonomous AI agent that controls a visible web browser to complete complex m
 - **Persistent sessions** — log in once, the agent reuses your sessions
 - **ARIA-based page understanding** — compact, token-efficient page extraction
 - **Security layer** — asks for confirmation before destructive actions (payments, deletions)
-- **Multi-provider LLM support** — Z.ai GLM-4.5-Flash (default), OpenAI, Claude
+- **Multi-provider LLM support** — Z.ai GLM-4.5-Flash (default), OpenAI, Claude (planned)
 - **Error recovery** — agent adapts when actions fail
 - **No hardcoded flows** — the agent discovers selectors, URLs, and steps dynamically
 
@@ -91,7 +91,7 @@ src/
 
 | Variable | Default | Description |
 |---|---|---|
-| `LLM_PROVIDER` | `glm` | LLM provider: `glm`, `openai` (`claude` not yet implemented) |
+| `LLM_PROVIDER` | `glm` | LLM provider: `glm`, `openai` (`claude` planned) |
 | `GLM_API_KEY` | — | Z.ai API key |
 | `OPENAI_API_KEY` | — | OpenAI API key |
 | `ANTHROPIC_API_KEY` | — | Anthropic API key |

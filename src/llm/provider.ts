@@ -5,6 +5,15 @@ import { OpenAIProvider } from './openai.js';
 
 /**
  * Factory: creates the right LLM provider based on config.
+ * 
+ * Supports:
+ * - GLM (Z.ai) - Default
+ * - OpenAI
+ * - Claude (Future support/stub)
+ * 
+ * @param config - Application configuration
+ * @returns Configured LLMProvider instance
+ * @throws Error if provider is unknown or missing API keys
  */
 export function createLLMProvider(config: Config): LLMProvider {
     switch (config.llmProvider) {

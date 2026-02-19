@@ -15,6 +15,13 @@ function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
  * Extracts page content using Playwright's ARIA snapshot.
  * The ARIA tree is a compact YAML representation of the accessibility tree,
  * which is far more token-efficient than raw HTML.
+ * 
+ * Strategy:
+ * 1. Wait for DOM content.
+ * 2. Attempt to get the ARIA snapshot (fast, structural, low token usage).
+ * 3. Fallback to recursive DOM traversal if ARIA snapshot fails.
+ * 4. Prioritize "open dialogs" by placing them at the top of the context.
+ * 5. Truncate content to fit within the `tokenBudget`.
  */
 export class PageExtractor {
     private tokenBudget: number;
@@ -168,6 +175,12 @@ export class PageExtractor {
     /**
      * Truncate content to fit within the token budget.
      * Rough heuristic: 1 token ≈ 4 characters.
+     * 
+     * We prefer keeping the TOP of the page (header, main content) and truncating 
+     * the footer/bottom, as the agent usually works top-to-bottom.
+     * 
+     * @param content - The full string content
+     * @returns Truncated string with defined token budget
      */
     private truncateToTokenBudget(content: string): string {
         const maxChars = this.tokenBudget * 4;

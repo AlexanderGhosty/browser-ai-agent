@@ -4,6 +4,11 @@ import { logger } from '../utils/logger.js';
 /**
  * Manages the Playwright browser lifecycle.
  * Uses a persistent context so user logins survive across sessions.
+ * 
+ * Design decisions:
+ * - Uses `launchPersistentContext` to store cookies/localStorage in `user_data` directory.
+ * - Forces a single-tab workflow (mostly) to simplify state management for the agent.
+ * - Disables automation flags where possible to reduce detection bot-detection.
  */
 export class BrowserManager {
     private context: BrowserContext | null = null;
@@ -41,6 +46,9 @@ export class BrowserManager {
     /**
      * Get the currently active page (last focused/created page).
      * Filters out closed pages to prevent "Target page has been closed" errors.
+     * 
+     * @returns The active Playwright Page object
+     * @throws Error if browser is not launched or no pages are open
      */
     getActivePage(): Page {
         if (!this.context) {

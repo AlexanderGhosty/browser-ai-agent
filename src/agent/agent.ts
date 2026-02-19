@@ -17,6 +17,12 @@ export interface AgentOptions {
 /**
  * The main autonomous browser agent.
  * Implements the observe → think → act loop.
+ * 
+ * This class orchestrates the agent's behavior by:
+ * 1. Extracting the current page state (observation)
+ * 2. Sending the state and conversation history to the LLM (thought)
+ * 3. Executing the tool calls returned by the LLM (action)
+ * 4. Preventing loops and handling errors
  */
 export class BrowserAgent {
     private llm: LLMProvider;
@@ -47,6 +53,14 @@ export class BrowserAgent {
     /**
      * Run the agent on a task.
      * Returns a summary of what was accomplished.
+     * 
+     * The run loop continues until:
+     * - The task is completed (LLM calls 'done')
+     * - The maximum number of iterations is reached
+     * - A fatal error occurs (e.g., browser closed)
+     * 
+     * @param task - The natural language task description
+     * @returns A distinct summary of the task execution result
      */
     async run(task: string): Promise<string> {
         this.isDone = false;
@@ -207,6 +221,10 @@ export class BrowserAgent {
     /**
      * Generate a summary when the agent hits the iteration limit.
      * Makes one final LLM call with only the `done` tool available.
+     * used to ensure the user gets a structured result even if the agent ran out of steps.
+     * 
+     * @param task - The original task description
+     * @returns A generated summary string
      */
     private async generateFinalSummary(task: string): Promise<string> {
         try {
@@ -244,6 +262,15 @@ export class BrowserAgent {
      * URL-aware loop detection.
      * Only flags as stuck when the same action is repeated on the SAME page URL.
      * This allows legitimate repeated actions (e.g. clicking "next" on different emails).
+     * 
+     * Strategies:
+     * 1. Exact repetition: Same action & arguments on same URL 3 times in a row.
+     * 2. Oscillating loop: Visiting the same URL 3+ times in the recent window.
+     * 
+     * @param recentActions - History of recent actions
+     * @param currentAction - The proposed action string
+     * @param currentUrl - The current page URL
+     * @returns True if a loop is detected
      */
     private isStuck(recentActions: Array<{ action: string; url: string }>, currentAction: string, currentUrl: string): boolean {
         // Check 1: Exact repetition (3 times same action on same URL)

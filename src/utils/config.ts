@@ -26,6 +26,12 @@ export interface Config {
 /**
  * Load and validate configuration from environment variables.
  * Throws if a required API key is missing for the selected provider.
+ * 
+ * Reads .env file using `dotenv` and validates against the `Config` interface.
+ * Defaults `maxIterations` to 50 if not specified.
+ * 
+ * @returns Validated Config object
+ * @throws Error if environment variables are invalid
  */
 export function loadConfig(): Config {
     const provider = (process.env.LLM_PROVIDER || 'glm') as LLMProviderType;

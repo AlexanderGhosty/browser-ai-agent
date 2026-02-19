@@ -3,6 +3,12 @@ import type { ToolDefinition } from '../llm/types.js';
 /**
  * All tool definitions in OpenAI function-calling JSON Schema format.
  * The agent uses these to decide which action to take.
+ * 
+ * Tools are categorized into:
+ * - Navigation: `navigate`, `go_back`
+ * - Interaction: `click`, `type`, `press_key`, `hover`, `select_option`
+ * - Perception: `read_page`, `scroll`, `wait`
+ * - Meta: `ask_user`, `done`
  */
 export const toolDefinitions: ToolDefinition[] = [
     {
@@ -212,7 +218,7 @@ export const toolDefinitions: ToolDefinition[] = [
                 properties: {
                     summary: {
                         type: 'string',
-                        description: 'Summary of what was accomplished during the task',
+                        description: 'Detailed summary of what was accomplished, including any specific counts (jobs applied to, emails deleted) and results.',
                     },
                 },
                 required: ['summary'],

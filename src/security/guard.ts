@@ -31,6 +31,12 @@ const DESTRUCTIVE_TOOL_PATTERNS: Array<{ tool: string; argPattern: RegExp }> = [
 /**
  * Security guard that detects potentially destructive actions
  * and asks for user confirmation before allowing execution.
+ * 
+ * Mechanism:
+ * 1. Checks tool name (only `click`, `type`, `press_key` are suspect).
+ * 2. Checks arguments against a list of destructive keywords (delete, pay, submit, etc.).
+ * 3. Checks page context (title/URL) for high-risk areas (checkout, settings).
+ * 4. If triggered, pauses execution and prompts the user via CLI.
  */
 export class SecurityGuard {
     private confirmCallback: ConfirmCallback;
@@ -80,6 +86,11 @@ export class SecurityGuard {
     /**
      * Determine if an action is destructive based on tool name, arguments,
      * and the current page context.
+     * 
+     * Heuristics:
+     * - Tool-specific patterns (e.g., clicking a button with "delete" in the text).
+     * - specific key presses (Enter).
+     * - Contextual keywords (e.g., "checkout" in URL + clicking "submit").
      */
     private isDestructiveAction(toolName: string, argsStr: string, pageContext: string): boolean {
         // Check tool-specific patterns

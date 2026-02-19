@@ -4,6 +4,12 @@ import { buildSystemPrompt, summarizeActions } from './prompts.js';
 /**
  * Manages the conversation context within a token budget.
  * Implements a sliding window with action history compression.
+ * 
+ * Key responsibilities:
+ * - Maintenance of the message history for the LLM.
+ * - Token counting and budget enforcement.
+ * - Context compression: summarizing past actions to save tokens while keeping recent detail.
+ * - Ensuring the context window is always valid (e.g., disjoint tool calls).
  */
 export class ContextManager {
     private messages: Message[] = [];
@@ -142,6 +148,12 @@ export class ContextManager {
     /**
      * Compress context if we're exceeding the budget.
      * Moves older messages into the action history summary.
+     * 
+     * Strategy:
+     * 1. Check if total estimated tokens exceed the budget.
+     * 2. If so, and we have enough history, drop the oldest messages.
+     * 3. Ensure we cut at a "safe" point (not between a tool call and its result).
+     * 4. The dropped messages are effectively "summarized" by the `summarizeActions` call in `getMessages`.
      */
     private compressIfNeeded() {
         const totalTokens = this.estimateTokens(this.messages);

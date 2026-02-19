@@ -1,7 +1,23 @@
 /**
- * System prompt and prompt templates for the browser agent.
+ * System prompt generator and template utilities.
+ * 
+ * This module contains the engineering of the "Agent Persona".
+ * It defines the rules, workflows, and behavioral constraints for the LLM.
  */
 
+/**
+ * Generates the dynamic system prompt for a specific task.
+ * 
+ * Includes:
+ * - Role definition (Autonomous AI)
+ * - Workflow steps (Observe-Think-Act)
+ * - Tool usage rules
+ * - Domain-specific heuristics (Shopping, Job Applications, Emails)
+ * - The current task description
+ * 
+ * @param task - The specific user objective
+ * @returns The full system message content
+ */
 export function buildSystemPrompt(task: string): string {
   return `You are an autonomous AI browser agent. You control a real web browser to complete tasks for the user.
 
