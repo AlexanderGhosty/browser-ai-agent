@@ -65,8 +65,10 @@ Watch the agent work in the browser! The agent will:
 src/
 ├── index.ts              # CLI entry point
 ├── agent/
-│   ├── agent.ts          # Main observe→think→act loop
-│   ├── context.ts        # Token budget & context compression
+│   ├── agent.ts          # Main loop: Observe → Think → Act
+│   │   ├── Loop Detection       # Prevents getting stuck on the same page/action
+│   │   └── Stale Page Recovery  # Handles closed tabs/windows automatically
+│   ├── context.ts        # Token budget & context compression (sliding window)
 │   └── prompts.ts        # System prompt engineering
 ├── llm/
 │   ├── provider.ts       # LLM factory
@@ -74,18 +76,27 @@ src/
 │   ├── openai.ts         # OpenAI provider
 │   └── types.ts          # Shared types
 ├── browser/
-│   ├── manager.ts        # Playwright lifecycle
-│   ├── extractor.ts      # ARIA snapshot page extraction
-│   └── actions.ts        # Browser action wrappers
+│   ├── manager.ts        # Playwright lifecycle (persistent context)
+│   ├── extractor.ts      # ARIA snapshot page extraction (token-efficient)
+│   └── actions.ts        # Browser action wrappers with auto-retries
 ├── tools/
 │   ├── definitions.ts    # Tool schemas for function calling
 │   └── executor.ts       # Tool dispatch & execution
 ├── security/
-│   └── guard.ts          # Destructive action detection
+│   └── guard.ts          # Destructive action detection (keywords & context)
 └── utils/
     ├── config.ts         # Environment config
     └── logger.ts         # Colored terminal output
 ```
+
+## Security
+
+The agent includes a **Security Guard** that intercepts every tool call before execution.
+
+- **Destructive Action Detection**: Blocks actions containing keywords like `delete`, `pay`, `submit`, `send`, `buy`, etc.
+- **Context Awareness**: Checks if the current page title/URL suggests a sensitive context (e.g., "Checkout", "Settings").
+- **Human-in-the-loop**: When a risky action is detected, the agent pauses and asks the user for confirmation in the terminal.
+
 
 ## Configuration
 
